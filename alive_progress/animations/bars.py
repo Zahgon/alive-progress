@@ -35,55 +35,6 @@ def bar_factory(chars=None, *, tip=None, background=None, borders=None, errors=N
 
     """
 
-    @bar_controller
-    def inner_bar_factory(length, spinner_factory=None):
-        if chars:
-            if is_wide(chars[-1]):  # previous chars can be anything.
-                def fill_style(complete, filling):  # wide chars fill.
-                    odd = bool(complete % 2)
-                    fill = (None,) if odd != bool(filling) else ()  # odd XOR filling.
-                    fill += (chars[-1], None) * int(complete / 2)  # already marked wide chars.
-                    if filling and odd:
-                        fill += mark_graphemes((chars[filling - 1],))
-                    return fill
-            else:  # previous chars cannot be wide.
-                def fill_style(complete, filling):  # narrow chars fill.
-                    fill = (chars[-1],) * complete  # unneeded marks here.
-                    if filling:
-                        fill += (chars[filling - 1],)  # no widies here.
-                    return fill
-        else:
-            def fill_style(complete, filling):  # invisible fill.
-                return fix_cells(padding[:complete + bool(filling)])
-
-        def running(fill):
-            return None, (fix_cells(padding[len(fill) + len_tip:]),)  # this is a 1-tuple.
-
-        def ended(fill):
-            border = None if len(fill) + len(underflow) <= length else underflow
-            texts = *(() if border else (underflow,)), blanks
-            return border, texts
-
-        @bordered(borders, '||')
-        def draw_known(apply_state, percent):
-            virtual_fill = round(virtual_length * max(0., min(1., percent)))
-            fill = fill_style(*divmod(virtual_fill, num_graphemes))
-            border, texts = apply_state(fill)
-            border = overflow if percent > 1. else None if percent == 1. else border
-            return fix_cells(combine_cells(fill, tip, *texts)[len_tip:length + len_tip]), border
-
-        if spinner_factory:
-            @bordered(borders, '||')
-            def draw_unknown(_percent=None):
-                return next(player), None
-
-            player = spinner_player(spinner_factory(length))
-        else:
-            draw_unknown = None
-
-        padding = (' ',) * len_tip + background * math.ceil((length + len_tip) / len(background))
-        virtual_length, blanks = num_graphemes * (length + len_tip), (' ',) * length
-        return draw_known, running, ended, draw_unknown
 
     assert chars or tip, 'tip is mandatory for transparent bars'
     assert not (chars and not is_wide(chars[-1]) and has_wide(chars)), \
@@ -96,53 +47,6 @@ def bar_factory(chars=None, *, tip=None, background=None, borders=None, errors=N
     return inner_bar_factory
 
 
-def bar_controller(inner_bar_factory):
-    def bar_assembler_factory(length, spinner_factory=None):
-        """Assembles this bar into an actual bar renderer.
-
-        Args:
-            length (int): the bar rendition length (excluding the borders)
-            spinner_factory (Optional[spinner_factory]): enable this bar to act in unknown mode
-
-        Returns:
-            a bar renderer
-
-        """
-        with about_time() as t_compile:
-            draw_known, running, ended, draw_unknown = inner_bar_factory(length, spinner_factory)
-
-        def draw(percent):
-            return draw_known(running, percent)
-
-        def draw_end(percent):
-            return draw_known(ended, percent)
-
-        def bar_check(*args, **kwargs):  # pragma: no cover
-            return check(draw, t_compile, *args, **kwargs)
-
-        draw.__dict__.update(
-            end=draw_end, unknown=draw_unknown,
-            check=fix_signature(bar_check, check, 2),
-        )
-
-        if draw_unknown:
-            def draw_unknown_end(_percent=None):
-                return draw_end(1.)
-
-            draw_unknown.end = draw_unknown_end
-
-        return draw
-
-    def compile_and_check(*args, **kwargs):  # pragma: no cover
-        """Compile this bar factory at some length, and..."""
-        # since a bar does not have a natural length, I have to choose one...
-        bar_assembler_factory(40).check(*args, **kwargs)  # noqa
-
-    bar_assembler_factory.__dict__.update(
-        check=fix_signature(compile_and_check, check, 2),
-    )
-
-    return bar_assembler_factory
 
 
 def check(bar, t_compile, verbosity=0, *, steps=20):  # noqa  # pragma: no cover
@@ -202,10 +106,6 @@ def spec_data(bar):  # pragma: no cover
     print(info('underflow', .5, bar.end))
 
 
-def format_codepoints(frame):  # pragma: no cover
-    codes = '|'.join((ORANGE if is_wide(g) else BLUE)(
-        ' '.join(hex(ord(c)).replace('0x', '') for c in g)) for g in frame)
-    return f" -> {RED(sum(len(fragment) for fragment in frame))}:[{codes}]"
 
 
 def render_data(bar, show_codepoints, steps):  # pragma: no cover

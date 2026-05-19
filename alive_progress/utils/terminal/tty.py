@@ -20,8 +20,6 @@ def new(original, max_cols):
             return max_cols
 
     def _ansi_escape_sequence(code, param=''):
-        def inner(_available=None):  # because of jupyter.
-            write(inner.sequence)
 
         inner.sequence = f'\x1b[{param}{code}'
         return inner

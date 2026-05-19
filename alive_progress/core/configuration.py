@@ -26,8 +26,6 @@ def _bar_input_factory():
 
 
 def __style_input(key_lookup, module_lookup, inner_name, default):
-    def _input(x):
-        return name_lookup(x) or func_lookup(x) or default
 
     name_lookup = __name_lookup(key_lookup)
     func_lookup = __func_lookup(module_lookup, inner_name)
@@ -36,74 +34,43 @@ def __style_input(key_lookup, module_lookup, inner_name, default):
 
 
 def __name_lookup(name_lookup):
-    def _input(x):
-        if isinstance(x, str):
-            return name_lookup.get(x) or ERROR
 
     return _input
 
 
 def __func_lookup(module_lookup, inner_name):
-    def _input(x):
-        if isinstance(x, FunctionType):
-            func_file, _ = os.path.splitext(module_lookup.__file__)
-            if x.__code__.co_name == inner_name \
-                    and func_file.endswith(os.path.splitext(x.__code__.co_filename)[0]):
-                return x
-            return ERROR
 
     return _input
 
 
 def _int_input_factory(lower, upper):
-    def _input(x):
-        try:
-            x = int(x)
-            return x if lower <= x <= upper else ERROR
-        except TypeError:
-            return ERROR
 
     _input.err_help = f'Expected an int between {lower} and {upper}'
     return _input
 
 
 def _float_input_factory(lower, upper):
-    def _input(x):
-        try:
-            x = float(x)
-            return x if lower <= x <= upper else ERROR
-        except TypeError:
-            return ERROR
 
     _input.err_help = f'Expected a float between {lower} and {upper}'
     return _input
 
 
 def _bool_input_factory():
-    def _input(x):
-        return bool(x)
 
     return _input
 
 
 def _tri_state_input_factory():
-    def _input(x):
-        return None if x is None else bool(x)
 
     return _input
 
 
 def _text_input_factory():
-    def _input(x):
-        return None if x is None else sanitize(str(x))
 
     return _input
 
 
 def _options_input_factory(valid: tuple, alias: dict):
-    def _input(x):
-        x = alias.get(x, x)
-        return x if x in valid else ERROR
 
     assert all(v in valid for v in alias.values()), f'invalid aliases: {alias.values()}'
     _input.err_help = f'Expected one of: {valid + tuple(alias)}'
@@ -111,14 +78,6 @@ def _options_input_factory(valid: tuple, alias: dict):
 
 
 def _format_input_factory(allowed):
-    def _input(x):
-        if not isinstance(x, str):
-            return bool(x)
-        fvars = parser.parse(x)
-        if any(f[1] not in allowed_all for f in fvars):
-            # f is a tuple (literal_text, field_name, format_spec, conversion)
-            return ERROR
-        return x
 
     allowed = allowed.split()
     # I want to accept only some field names, and pure text.
@@ -129,8 +88,6 @@ def _format_input_factory(allowed):
 
 
 def _file_input_factory():
-    def _input(x):
-        return x if all(hasattr(x, m) for m in ('write', 'flush')) else ERROR
 
     _input.err_help = 'Expected sys.stdout, sys.stderr, or a similar TextIOWrapper object'
     return _input
@@ -186,9 +143,7 @@ def create_config():
 
     def create_context(theme=None, **options):
         """Create an immutable copy of the current configuration, with optional customization."""
-        lazy_init()
-        local_config = {**global_config, **_parse(theme, options)}
-        return Config(**local_config)
+        pass
 
     def _parse(theme, options):
         """Validate and convert some configuration options."""

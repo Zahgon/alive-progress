@@ -20,13 +20,6 @@ def spinner_player(spinner):
 def bordered(borders, default):
     """Decorator to include controllable borders in the outputs of a function."""
 
-    def wrapper(fn):
-        @wraps(fn)
-        def inner_bordered(*args, **kwargs):
-            content, right = fn(*args, **kwargs)
-            return combine_cells(left_border, content, right or right_border)
-
-        return inner_bordered
 
     left_border, right_border = extract_fill_graphemes(borders, default)
     return wrapper
@@ -88,7 +81,7 @@ def combinations(nums):
 
     def lcm(a, b):
         """Calculate the lowest common multiple of two numbers."""
-        return a * b // math.gcd(a, b)
+        pass
 
     return reduce(lcm, nums)
 

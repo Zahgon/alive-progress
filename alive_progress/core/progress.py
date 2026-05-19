@@ -214,17 +214,6 @@ def __alive_bar(config, total=None, *, calibrate=None,
         bar_handle._handle = None
         return time.perf_counter() - run.init
 
-    @contextmanager
-    def pause_monitoring():
-        event_renderer.clear()
-        offset = stop_monitoring()
-        alive_repr(term)
-        term.write('\n')
-        term.flush()
-        try:
-            yield
-        finally:
-            start_monitoring(offset)
 
     if total or not config.manual:  # we can count items.
         logic_total, current = total, lambda: run.count
@@ -279,33 +268,16 @@ def __alive_bar(config, total=None, *, calibrate=None,
         run.monitor_text = human_count(run.count, precision)
         return f.format(count=run.monitor_text, total=total_human, percent=run.percent)
 
-    def monitor_end(f):
-        warning = '(!) ' if total is not None and current() != logic_total else ''
-        return f'{warning}{monitor_run(f, None)}'
 
-    def elapsed_run(f):
-        return f.format(elapsed=time_display(run.elapsed, RUN))
 
-    def elapsed_end(f):
-        return f.format(elapsed=time_display(run.elapsed, END))
 
-    def stats_end(f):
-        run.rate_text = rate_text(2)
-        return f.format(rate=run.rate_text, unit=unit)
 
     if total or config.manual:  # we can track progress and therefore eta.
-        def stats_run(f):
-            run.rate_text = rate_text(1)  # although repeated below,
-            run.eta_text = eta_text(gen_eta.send((current(), run.rate)))
-            return f.format(rate=run.rate_text, unit=unit, eta=run.eta_text)
 
         gen_eta = gen_simple_exponential_smoothing(.5, fn_simple_eta(logic_total))
         gen_eta.send(None)
         stats_default = '({eta}, {rate})'
     else:  # unknown progress.
-        def stats_run(f):
-            run.rate_text = rate_text(1)  # it won't be calculated if not needed.
-            return f.format(rate=run.rate_text, eta='?')
 
         bar_repr = bar_repr.unknown
         stats_default = '({rate})'
@@ -339,12 +311,6 @@ def __alive_bar(config, total=None, *, calibrate=None,
     stats = _Widget(stats_run, config.stats, stats_default)
     stats_end = _Widget(stats_end, config.stats_end, '({rate})' if stats.f[:-1] else '')
 
-    def get_receipt():
-        buffer = io.StringIO()
-        tbuf = terminal.get_term(buffer, True, 1000)  # large enough to not truncate.
-        run.last_len = 0  # prevents the inclusion of the clear end line escape sequence.
-        alive_repr(tbuf)
-        return buffer.getvalue().strip()
 
     bar_handle = __AliveBarHandle(pause_monitoring, set_title, set_text,
                                   current, lambda: run.monitor_text, lambda: run.rate_text,

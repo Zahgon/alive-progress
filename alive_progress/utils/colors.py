@@ -19,8 +19,6 @@ So, these special cells would require yet more work.
 
 
 def color_factory(color_code):
-    def apply(text: str, format_spec=''):
-        return f'{color_code}{text:{format_spec}}\x1b[0m'
 
     def mix(*colors):
         return [color_factory(c.color_code + color_code) for c in colors]

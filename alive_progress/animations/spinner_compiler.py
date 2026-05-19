@@ -38,18 +38,10 @@ def spinner_controller(*, natural, skip_compiler=False):
 
         def compile_and_check(*args, **kwargs):  # pragma: no cover
             """Compile this spinner factory at its natural length, and..."""
-            spinner_compiler_dispatcher_factory().check(*args, **kwargs)
+            pass
 
-        def set_operational(**params):
-            signature(spinner_inner_factory).bind(1, **params)  # test arguments (one is provided).
-            return inner_controller(spinner_inner_factory, params, extra_commands)
 
         def schedule_command(command):
-            def inner_schedule(*args, **kwargs):
-                signature(command).bind(1, *args, **kwargs)  # test arguments (one is provided).
-                extra, cmd_type = dict(extra_commands), EXTRA_COMMANDS[command]
-                extra[cmd_type] = extra.get(cmd_type, ()) + ((command, args, kwargs),)
-                return inner_controller(spinner_inner_factory, op_params, extra)
 
             return fix_signature(inner_schedule, command, 1)
 
@@ -77,9 +69,6 @@ Runner commands can only change presentation order.
 
 
 def extra_command(is_compiler):
-    def inner_command(command):
-        EXTRA_COMMANDS[command] = is_compiler
-        return command
 
     return inner_command
 
@@ -171,9 +160,6 @@ def transpose(spec):
 def sequential(spec):
     """Configure the runner to play the compiled cycles in sequential order."""
 
-    def cycle_data(data):
-        while True:
-            yield from data
 
     cycle_data.name = 'sequential'
     spec.__dict__.update(strategy=cycle_data, cycles=len(spec.data))
@@ -188,9 +174,6 @@ def randomize(spec, cycles=None):  # noqa
 
     """
 
-    def cycle_data(data):
-        while True:
-            yield random.choice(data)
 
     cycle_data.name = 'randomized'
     spec.__dict__.update(strategy=cycle_data, cycles=max(0, cycles or 0) or spec.cycles)
@@ -250,11 +233,8 @@ def spinner_runner_factory(spec, t_compile, extra_commands):
         """Wow, you are really deep! This is the runner of a compiled spinner.
         Every time you call this function, a different generator will kick in,
         which yields the frames of the current animation cycle. Enjoy!"""
+        pass
 
-        yield from next(cycle_gen)  # I love generators!
-
-    def runner_check(*args, **kwargs):  # pragma: no cover
-        return check(spec, *args, **kwargs)
 
     spinner_runner.__dict__.update(spec.__dict__, check=fix_signature(runner_check, check, 1))
     spec.__dict__.update(t_compile=t_compile, runner=spinner_runner)  # set after the update above.
@@ -319,10 +299,6 @@ def spec_data(spec):  # pragma: no cover
     print('\n'.join(info(field) for field in ('frames', 'total_frames')))
 
 
-def format_codepoints(frame):  # pragma: no cover
-    codes = '|'.join((ORANGE if is_wide(g) else BLUE)(
-        ' '.join(hex(ord(c)).replace('0x', '') for c in g)) for g in frame)
-    return f" -> {RED(sum(len(fragment) for fragment in frame))}:[{codes}]"
 
 
 def render_data(spec, show_codepoints):  # pragma: no cover

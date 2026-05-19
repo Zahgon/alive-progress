@@ -9,91 +9,6 @@ from ..utils.colors import GREEN, ORANGE, RED
 CACHE = '.unicode_cache'
 
 
-def validate_unicode_breaks(uver=None, show_all=False, cache=True):
-    # validate unicode grapheme clusters detection.
-    # this downloads the specs directly from unicode.org and caches it locally.
-    # document: https://unicode.org/reports/tr51/
-
-    latest = f'{CACHE}/latest'
-    if not uver and cache and os.path.exists(latest):
-        with open(latest) as f:
-            uver = f.read()
-        print('using version "latest" as:', uver)
-
-    file = f'{CACHE}/emoji-test_{uver}.txt'
-    if cache and os.path.exists(file):
-        print('loading cached:', file)
-        with open(file) as f:
-            data = f.read()
-    else:
-        url = f'https://www.unicode.org/Public/emoji/{uver or "latest"}/emoji-test.txt'
-        print('downloading:', url)
-
-        try:
-            req = urllib.request.urlopen(url)
-        except OSError as e:
-            print(RED('Download error:'), e)
-            return
-
-        os.makedirs(os.path.dirname(file), exist_ok=True)
-        if not uver:
-            new_url = req.geturl()
-            uver = new_url.split('/')[5]
-            print('saving version "latest" as:', uver)
-            with open(latest, 'w') as f:
-                f.write(uver)
-            file = f'{CACHE}/emoji-test_{uver}.txt'
-
-        print('saving:', file)
-        data = req.read().decode('utf8')
-        with open(file, 'w') as f:
-            f.write(data)
-
-    def where():
-        nonlocal groups
-        if any(groups):
-            print('\n'.join(g for g in groups if g))
-        groups = [None, None]
-
-    def expect(*chars):
-        nonlocal errors, total
-        text = ''.join(chars)
-        actual = split_graphemes(text)
-        error = actual != chars
-        total += 1
-        errors += error
-        if error or show_all:
-            where()
-            codes = '|'.join((GREEN if a == c else RED)(
-                ' '.join(hex(ord(c)).replace('0x', '') for c in a) if a else '-'
-            ) for a, c in zip_longest(actual, chars))
-            small_name = name.replace(' skin tone', '').replace(' hair', '')
-            small_status = ''.join(x[0] for x in status.split('-'))
-            a_len, c_len = len(actual), len(chars)
-            size = f'{GREEN(a_len)} ==' if a_len == c_len else f'{RED(a_len)} !='
-            print(f' {char}   {text.replace(char, "X"):>3}: {size} {c_len} -> '
-                  f'|{codes}| {ORANGE(small_status)} {small_name}')
-
-    groups, total, errors = [None, None], 0, 0
-    for line in filter(None, data.splitlines()):
-        if line.startswith('#'):
-            if line.startswith('# group:'):
-                groups[0] = line.split()[-1]
-            elif line.startswith('# subgroup:'):
-                groups[1] = f'  - {line.split()[-1]}'
-            continue
-
-        p1, p2 = (p.split() for p in line.split(';'))
-        status, name = p2[0], ' '.join(p2[4:])
-        char = ''.join(chr(int(x, 16)) for x in p1)
-        expect(char)
-        expect(char, char)
-        expect('a', char, 'a')
-        expect('a', 'a', char)
-        expect(char, 'a', 'a')
-
-    print(f'\nerrors   : {errors / total:6.2%} [{errors}/{total}]')
-    print(f'successes: {1 - errors / total:6.2%} [{total - errors}/{total}]')
 
 
 def find_groups(data, max_diff):
@@ -134,18 +49,7 @@ def find_groups(data, max_diff):
     0x1F9D8, 0x1F9D9, 0x1F9DA, 0x1F9DB, 0x1F9DC, 0x1F9DD
 
     """
-    it = iter(sorted(data))
-    last_item = next(it)
-    current_group = [last_item]
-    result = [current_group]
-    for i in it:
-        if i - last_item > max_diff:
-            current_group = []
-            result.append(current_group)
-        current_group.append(i)
-        last_item = i
-    print('\n'.join(f'{len(g)}:|' + ' '.join(hex(x).replace('0x', '') for x in g) + '|'
-                    for g in result))
+    pass
 
 
 if __name__ == '__main__':

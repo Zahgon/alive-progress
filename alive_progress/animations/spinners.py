@@ -42,18 +42,6 @@ def frame_spinner_factory(*frames):
     # support for unicode grapheme clusters and emoji chars.
     frames = tuple(tuple(to_cells(frame) for frame in cycle) for cycle in frames)
 
-    @spinner_controller(natural=max(len(frame) for cycle in frames for frame in cycle))
-    def inner_spinner_factory(actual_length=None):
-        actual_length = actual_length or inner_spinner_factory.natural
-        max_ratio = math.ceil(actual_length / min(len(frame) for cycle in frames
-                                                  for frame in cycle))
-
-        def frame_data(cycle):
-            for frame in cycle:
-                # differently sized frames and repeat support.
-                yield (frame * max_ratio)[:actual_length]
-
-        return (frame_data(cycle) for cycle in frames)
 
     return inner_spinner_factory
 
@@ -83,39 +71,6 @@ def scrolling_spinner_factory(chars, length=None, block=None, background=None, *
     assert not (overlay and has_wide(background)), 'unsupported overlay with grapheme background'
     chars, rounder = to_cells(chars), round_even if has_wide(chars) else math.ceil
 
-    @spinner_controller(natural=length or len(chars))
-    def inner_spinner_factory(actual_length=None):
-        actual_length = actual_length or inner_spinner_factory.natural
-        ratio = actual_length / inner_spinner_factory.natural
-
-        initial, block_size = 0, rounder((block or 0) * ratio) or len(chars)
-        if hide:
-            gap = actual_length
-        else:
-            gap = max(0, actual_length - block_size)
-            if right:
-                initial = -block_size if block else abs(actual_length - block_size)
-
-        if block:
-            def get_block(g):
-                return fix_cells((mark_graphemes((g,)) * block_size)[:block_size])
-
-            contents = map(get_block, strip_marks(reversed(chars) if right else chars))
-        else:
-            contents = (chars,)
-
-        window_impl = overlay_sliding_window if overlay else static_sliding_window
-        infinite_ribbon = window_impl(to_cells(background or ' '),
-                                      gap, contents, actual_length, right, initial)
-
-        def frame_data():
-            for i, fill in zip(range(gap + block_size), infinite_ribbon):
-                if i <= size:
-                    yield fill
-
-        size = gap + block_size if wrap or hide else abs(actual_length - block_size)
-        cycles = len(tuple(strip_marks(chars))) if block else 1
-        return (frame_data() for _ in range(cycles))
 
     return inner_spinner_factory
 
@@ -165,23 +120,6 @@ def sequential_spinner_factory(*spinner_factories, intermix=True):
 
     """
 
-    @spinner_controller(natural=max(factory.natural for factory in spinner_factories))
-    def inner_spinner_factory(actual_length=None):
-        actual_length = actual_length or inner_spinner_factory.natural
-        spinners = [factory(actual_length) for factory in spinner_factories]
-
-        def frame_data(spinner):
-            yield from spinner()
-
-        if intermix:
-            cycles = combinations(spinner.cycles for spinner in spinners)
-            gen = ((frame_data(spinner) for spinner in spinners)
-                   for _ in range(cycles))
-        else:
-            gen = ((frame_data(spinner) for _ in range(spinner.cycles))
-                   for spinner in spinners)
-
-        return (c for c in chain.from_iterable(gen))  # transforms the chain to a gen exp.
 
     return inner_spinner_factory
 
@@ -201,31 +139,6 @@ def alongside_spinner_factory(*spinner_factories, pivot=None):
 
     """
 
-    @spinner_controller(natural=sum(factory.natural for factory in spinner_factories))
-    def inner_spinner_factory(actual_length=None, offset=0):
-        if actual_length:
-            lengths = spread_weighted(actual_length, [f.natural for f in spinner_factories])
-            actual_pivot = None if pivot is None or not lengths[pivot] \
-                else spinner_factories[pivot](lengths[pivot])
-            spinners = [factory(length) for factory, length in
-                        zip(spinner_factories, lengths) if length]
-        else:
-            actual_pivot = None if pivot is None else spinner_factories[pivot]()
-            spinners = [factory() for factory in spinner_factories]
-
-        def frame_data(cycle_gen):
-            yield from (combine_cells(*fragments) for _, *fragments in cycle_gen)
-
-        frames = combinations(spinner.total_frames for spinner in spinners)
-        spinners = [spinner_player(spinner) for spinner in spinners]
-        [[next(player) for _ in range(i * offset)] for i, player in enumerate(spinners)]
-
-        if actual_pivot is None:
-            breaker, cycles = lambda: range(frames), 1
-        else:
-            breaker, cycles = lambda: actual_pivot(), \
-                frames // actual_pivot.total_frames * actual_pivot.cycles
-        return (frame_data(zip(breaker(), *spinners)) for _ in range(cycles))
 
     return inner_spinner_factory
 
@@ -249,9 +162,5 @@ def delayed_spinner_factory(spinner_factory, copies, offset=1, *, dynamic=True):
         factories = (spinner_factory,) * copies
         return alongside_spinner_factory(*factories, pivot=0).op(offset=offset)
 
-    @spinner_controller(natural=spinner_factory.natural * copies, skip_compiler=True)
-    def inner_spinner_factory(actual_length=None):
-        n = math.ceil(actual_length / spinner_factory.natural) if actual_length else copies
-        return delayed_spinner_factory(spinner_factory, n, offset, dynamic=False)(actual_length)
 
     return inner_spinner_factory
